@@ -29,7 +29,8 @@ def _malformed_reason(finding):
     line = finding.get("line")
     if type(line) is not int or line <= 0:
         return "linha inválida"
-    if finding.get("label") not in LABELS:
+    label = finding.get("label")
+    if not isinstance(label, str) or label not in LABELS:
         return "rótulo fora da lista"
     votes = finding.get("votes")
     if not isinstance(votes, list):
@@ -63,10 +64,11 @@ def filter_findings(validators, findings):
     for finding in findings:
         reason = _publication_reason(finding, expected)
         if reason is None and finding["label"] == "nitpick":
-            if nitpicks_by_reviewer[finding["revisor"]] >= NITPICK_LIMIT:
+            reviewer = finding["revisor"].strip()
+            if nitpicks_by_reviewer[reviewer] >= NITPICK_LIMIT:
                 reason = "limite de três nitpicks por revisor excedido"
             else:
-                nitpicks_by_reviewer[finding["revisor"]] += 1
+                nitpicks_by_reviewer[reviewer] += 1
         if reason is None:
             result["publicaveis"].append({key: value for key, value in finding.items() if key != "votes"})
         else:

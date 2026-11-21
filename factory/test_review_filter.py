@@ -102,6 +102,13 @@ class FindingsTest(unittest.TestCase):
         result = filter_findings(VALIDATORS, [finding("F1", label="crítico")])
         self.assertEqual(result["internos"][0]["motivo"], "rótulo fora da lista")
 
+    def test_non_text_label_isolates_only_that_finding(self):
+        findings = [finding("F1"), finding("F2", label=["nitpick"]), finding("F3", label={"x": 1}), finding("F4")]
+        result = filter_findings(VALIDATORS, findings)
+        self.assertEqual(ids(result["publicaveis"]), ["F1", "F4"])
+        self.assertEqual(internos_ids(result), ["F2", "F3"])
+        self.assertTrue(all(item["motivo"] == "rótulo fora da lista" for item in result["internos"]))
+
     def test_missing_validator_vote_goes_to_internos(self):
         result = filter_findings(VALIDATORS, [finding("F1", votes=[vote("V1")])])
         self.assertEqual(result["internos"][0]["motivo"], "votos ausentes, duplicados ou fora do grupo")
@@ -134,6 +141,13 @@ class NitpickLimitTest(unittest.TestCase):
         result = filter_findings(VALIDATORS, findings)
         self.assertEqual(len(result["publicaveis"]), 4)
 
+    def test_reviewer_id_with_surrounding_spaces_counts_as_same_reviewer(self):
+        findings = [finding("F1", revisor="R1"), finding("F2", revisor="R1 "), finding("F3", revisor="R1"), finding("F4", revisor=" R1")]
+        result = filter_findings(VALIDATORS, findings)
+        self.assertEqual(ids(result["publicaveis"]), ["F1", "F2", "F3"])
+        self.assertEqual(internos_ids(result), ["F4"])
+        self.assertEqual(result["internos"][0]["motivo"], "limite de três nitpicks por revisor excedido")
+
     def test_rejected_nitpick_does_not_consume_limit(self):
         findings = [finding("F0", revisor="R1", votes=[vote("V1", confirmed=False), vote("V2")])]
         findings += [finding(f"F{i}", revisor="R1") for i in range(1, 4)]
@@ -157,6 +171,13 @@ class CommandLineTest(unittest.TestCase):
         output = json.loads(completed.stdout)
         self.assertEqual(ids(output["publicaveis"]), ["F1"])
         self.assertEqual(internos_ids(output), ["F2"])
+
+    def test_non_text_label_does_not_abort_the_cli(self):
+        completed = self.run_filter({"validators": VALIDATORS, "findings": [finding("F1", label=["nitpick"]), finding("F2")]})
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        output = json.loads(completed.stdout)
+        self.assertEqual(ids(output["publicaveis"]), ["F2"])
+        self.assertEqual(internos_ids(output), ["F1"])
 
     def test_invalid_group_exits_one_with_message(self):
         completed = self.run_filter({"validators": ["V1"], "findings": []})
