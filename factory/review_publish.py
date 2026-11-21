@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from urllib.parse import quote
 
 from review_filter import filter_findings
 
@@ -24,6 +25,62 @@ def github_api(endpoint, *, payload=None, paginate=False, method="POST"):
         check=True,
     )
     return json.loads(response.stdout)
+
+
+def patch_has_line(patch, target):
+    line = None
+    for entry in patch.split("\n"):
+        header = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", entry)
+        if header:
+            line = int(header[1])
+        elif line is not None and entry.startswith(("+", " ")):
+            if line == target:
+                return True
+            line += 1
+    return False
+
+
+def publish_summary(api, endpoint, repo, base, head, findings, check_version, result):
+    if not findings:
+        return
+    reviews_endpoint = f"{endpoint}/reviews"
+    marker = f"<!-- factory-review-summary:{base}:{head} -->"
+    prior = next(
+        (review for page in api(reviews_endpoint, paginate=True) for review in page
+         if (review.get("body") or "").endswith(marker)),
+        None,
+    )
+    previous = prior["body"].removesuffix(marker).rstrip() if prior else "## Achados fora do diff"
+    additions = []
+    locations = []
+    for (path, line), entries in findings.items():
+        url = f"https://github.com/{repo}/blob/{head}/{quote(path)}#L{line}"
+        location = {"file": path, "line": line}
+        new_entries = []
+        for finding_marker, (body, _) in entries.items():
+            key = hashlib.sha256(json.dumps([path, line, finding_marker]).encode()).hexdigest()
+            entry_marker = f"<!-- factory-summary-finding:{key} -->"
+            if entry_marker not in previous:
+                new_entries.append(f"{body}\n\n{entry_marker}")
+        if new_entries:
+            display_path = re.sub(r"([\\\[\]])", r"\\\1", path)
+            additions.append(f"[{display_path}, linha {line}]({url})\n\n" + "\n\n".join(new_entries))
+            locations.append(location)
+        else:
+            result["existentes"].append({**location, "url": prior["html_url"]})
+    if not additions or not check_version():
+        return
+    body = "\n\n".join([previous, *additions, marker])
+    try:
+        if prior is None:
+            review = api(reviews_endpoint, payload={"body": body, "event": "COMMENT", "commit_id": head})
+        else:
+            review = api(f"{reviews_endpoint}/{prior['id']}", payload={"body": body}, method="PUT")
+    except subprocess.CalledProcessError as error:
+        result["estado"] = "pendente"
+        result["pendentes"].extend({**location, "motivo": error.stderr.strip()} for location in locations)
+    else:
+        result["publicados"].extend({**location, "url": review["html_url"]} for location in locations)
 
 
 def publish_review(api, repo, number, review):
@@ -67,15 +124,23 @@ def publish_review(api, repo, number, review):
 
     if not by_location:
         return result
+    patches = {
+        item["filename"]: item.get("patch") or ""
+        for page in api(f"{endpoint}/files", paginate=True) for item in page
+    }
     existing = [
         comment for page in api(comments_endpoint, paginate=True) for comment in page
     ]
+    outside_diff = {}
     for (path, line), findings in by_location.items():
         # A posição no mesmo commit continua estável quando a redação muda entre rodadas.
         key = hashlib.sha256(json.dumps([base, head, path, line]).encode()).hexdigest()
         marker = f"<!-- factory-review:{key} -->"
         location = {"file": path, "line": line}
         prior = next((item for item in existing if item["body"].endswith(marker)), None)
+        if prior is None and not patch_has_line(patches.get(path, ""), line):
+            outside_diff[(path, line)] = findings
+            continue
         previous = prior["body"].removesuffix(marker).rstrip() if prior else ""
         legacy = previous.split("<!-- factory-finding:", 1)[0]
         additions = [
@@ -103,6 +168,8 @@ def publish_review(api, repo, number, review):
             result["pendentes"].append({**location, "motivo": error.stderr.strip()})
         else:
             result["publicados"].append({**location, "url": comment["html_url"]})
+    if result["estado"] not in {"desatualizado", "pr_fechada"}:
+        publish_summary(api, endpoint, repo, base, head, outside_diff, check_version, result)
     return result
 
 
