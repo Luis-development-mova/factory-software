@@ -20,6 +20,12 @@ Quando o mesmo problema aparecer em mais de uma PR, confirme a recorrência e pr
 
 Quando for falso positivo, registre neste manual um exemplo, a justificativa e as condições em que a exceção vale.
 
+Para um achado que possa se repetir, o Grupo 1 pode fornecer `pattern`, um identificador curto e consistente do sintoma (ex.: `link-markdown-quebrado`). Quando houver origem demonstrável, inclua `cause` com `file`, `line`, `fragment` (trecho literal que causa a falha), `evidence` (como esse trecho produz o erro no SHA avaliado) e `proposal` (correção na origem). Use a mesma referência para o mesmo defeito, mesmo que os arquivos afetados tenham textos diferentes.
+
+O Grupo 2 registra `cause_confirmed: true` no voto apenas se verificar por conta própria o arquivo, a linha, o trecho e a relação com a falha. O orquestrador preserva esse campo e os campos opcionais do achado no JSON de votos. Se a falha for intencional em uma amostra descartável, deixe-a fora da análise de recorrência omitindo `pattern` e `cause` ou negando a confirmação da causa conforme a evidência.
+
+O comando cruza os votos locais do mesmo repositório. Só gera proposta quando PRs distintas têm achados unânimes com a mesma origem confirmada. Sintomas semelhantes cuja origem ainda está em aberto ficam como suspeitas. Registros antigos sem esses campos continuam válidos para a revisão, mas ficam fora da comparação.
+
 ## Como validar o filtro
 
 No Claude Code, execute `/factory review <n>` para revisar uma PR. O orquestrador grava os votos e o parecer local em `factory/jobs/`, com os SHAs avaliados. O parecer contém as minutas, os achados internos e o resultado da publicação.
