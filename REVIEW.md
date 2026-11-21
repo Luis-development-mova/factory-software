@@ -28,6 +28,8 @@ Execute `python3 factory/review_filter.py < votos.json`. O orquestrador deve fix
 
 Use a lista `publicaveis` para preparar comentários e guarde `internos` no parecer. O comando devolve as listas sem publicar no GitHub.
 
+Comece o texto de cada minuta com o rótulo aprovado em negrito (`**Importante:**`, `**Nitpick:**` ou `**Já existente:**`). Preserve esse prefixo no comentário publicado no GitHub para que a classificação fique visível na PR.
+
 - Um achado com arquivo, linha e impacto confirmados por todos gera um comentário.
 - Um achado com voto divergente ou ausente fica no parecer interno.
 - Um achado malformado vai para `internos` com o motivo; os demais achados continuam sendo avaliados.
