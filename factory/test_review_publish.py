@@ -16,15 +16,19 @@ class ReviewPublicationTest(unittest.TestCase):
             for name in ("V1", "V2")
         ]
 
-    def api(self, endpoint, *, payload=None, paginate=False):
+    def api(self, endpoint, *, payload=None, paginate=False, method="POST"):
         if endpoint == self.endpoint and payload is None:
             return self.pr
+        if method == "PATCH":
+            comment = self.comments[int(endpoint.rsplit("/", 1)[1]) - 1]
+            comment.update(payload)
+            return comment
         if endpoint != self.endpoint + "/comments":
             self.fail(f"Endpoint inesperado: {endpoint}")
         if payload is None:
             self.assertTrue(paginate)
             return [self.comments[:1], self.comments[1:]]
-        comment = {**payload, "html_url": f"https://example.com/{len(self.comments) + 1}"}
+        comment = {**payload, "id": len(self.comments) + 1, "html_url": f"https://example.com/{len(self.comments) + 1}"}
         self.comments.append(comment)
         return comment
 
@@ -66,3 +70,14 @@ class ReviewPublicationTest(unittest.TestCase):
                 self.assertEqual(result["estado"], "desatualizado")
                 self.assertEqual(self.comments, [])
                 self.pr[ref]["sha"] = saved_sha
+
+    def test_new_finding_updates_existing_comment_on_same_line(self):
+        first = self.finding()
+        second = self.finding(scenario="Destino alternativo", evidence="O destino exige login.",
+                              impact="O leitor sem conta não tem acesso.")
+        self.publish(first)
+        self.publish(first, second)
+        self.publish(second)
+        comment, = self.comments
+        self.assertEqual(comment["body"].count("Link do manual"), 1)
+        self.assertEqual(comment["body"].count("Destino alternativo"), 1)
