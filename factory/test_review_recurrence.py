@@ -57,6 +57,19 @@ class ReviewRecurrenceTest(unittest.TestCase):
         suspicion, = result["suspeitas"]
         self.assertEqual([item["pr"] for item in suspicion["ocorrencias"]], [8, 10])
 
+    def test_unanimous_cause_above_nitpick_limit_still_proposes_fix(self):
+        self.write_review(8)
+        path = self.jobs / "pr-8-votos.json"
+        review = json.loads(path.read_text())
+        original, = review["findings"]
+        extras = [dict(original, id=f"N{i}", pattern=f"outro sintoma {i}", cause=None) for i in range(3)]
+        review["findings"] = extras + [original]
+        path.write_text(json.dumps(review))
+        self.write_review(10)
+        result = detect_recurrence(self.jobs, "owner/repo", 10)
+        proposal, = result["propostas"]
+        self.assertEqual([item["pr"] for item in proposal["ocorrencias"]], [8, 10])
+
     def test_pattern_spacing_and_hyphens_count_as_same_symptom(self):
         self.write_review(8, pattern="link-markdown-quebrado", with_cause=False)
         self.write_review(9, pattern="imagem ausente", with_cause=False)

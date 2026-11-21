@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 import sys
 
-from review_filter import filter_findings
+from review_filter import accepted_findings
 
 
 def confirmed_cause(finding):
@@ -38,7 +38,7 @@ def unanimous_findings(review):
         {**finding, "cause": confirmed_cause(finding)} if isinstance(finding, dict) else finding
         for finding in findings
     ]
-    return filter_findings(review.get("validators"), candidates)["publicaveis"]
+    return accepted_findings(review.get("validators"), candidates)
 
 
 def detect_recurrence(jobs, repo, current_pr):
