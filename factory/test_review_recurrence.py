@@ -13,14 +13,15 @@ class ReviewRecurrenceTest(unittest.TestCase):
         self.jobs = Path(directory.name)
 
     def write_review(self, number, *, source="modelos/guia.tpl", fragment="errado.md",
-                     scenario="Link quebrado", confirmed=True, cause_confirmed=True):
+                     scenario="Link quebrado", confirmed=True, cause_confirmed=True,
+                     pattern="link-markdown-quebrado", with_cause=True):
         finding = {
             "id": "F1", "file": f"guia-{number}.md", "line": 3,
             "scenario": scenario, "evidence": "O alvo não existe.", "impact": "Link indisponível.",
-            "label": "nitpick", "revisor": "R1", "pattern": "link-markdown-quebrado",
+            "label": "nitpick", "revisor": "R1", "pattern": pattern,
             "cause": {"file": source, "line": 3, "fragment": fragment,
                       "evidence": "O manifesto aponta para esse trecho do modelo.",
-                      "proposal": "Corrigir o alvo no modelo e regenerar os guias."},
+                      "proposal": "Corrigir o alvo no modelo e regenerar os guias."} if with_cause else None,
             "votes": [
                 {"validator": voter, "confirmed": confirmed, "reason": "Revisei o achado.",
                  "cause_confirmed": cause_confirmed}
@@ -55,3 +56,25 @@ class ReviewRecurrenceTest(unittest.TestCase):
         self.assertEqual(result["propostas"], [])
         suspicion, = result["suspeitas"]
         self.assertEqual([item["pr"] for item in suspicion["ocorrencias"]], [8, 10])
+
+    def test_pattern_spacing_and_hyphens_count_as_same_symptom(self):
+        self.write_review(8, pattern="link-markdown-quebrado", with_cause=False)
+        self.write_review(9, pattern="imagem ausente", with_cause=False)
+        self.write_review(10, pattern="link markdown quebrado", with_cause=False)
+        result = detect_recurrence(self.jobs, "owner/repo", 10)
+        suspicion, = result["suspeitas"]
+        self.assertEqual(suspicion["padrao"], "link markdown quebrado")
+        self.assertEqual([item["pr"] for item in suspicion["ocorrencias"]], [8, 10])
+
+    def test_history_file_without_repo_registers_gap_and_is_skipped(self):
+        self.write_review(8)
+        history = self.jobs / "pr-8-votos.json"
+        review = json.loads(history.read_text())
+        del review["repo"]
+        history.write_text(json.dumps(review))
+        self.write_review(10)
+        result = detect_recurrence(self.jobs, "owner/repo", 10)
+        self.assertEqual(result["propostas"], [])
+        self.assertEqual(result["lacunas"], [
+            {"arquivo": "pr-8-votos.json", "motivo": "O registro não informa o repositório."},
+        ])

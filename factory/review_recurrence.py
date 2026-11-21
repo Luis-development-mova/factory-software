@@ -26,6 +26,10 @@ def confirmed_cause(finding):
     return {key: cause[key].strip() for key in fields} | {"line": line}
 
 
+def normalize_pattern(pattern):
+    return re.sub(r"[\s_-]+", " ", pattern.strip().lower()).strip()
+
+
 def unanimous_findings(review):
     findings = review.get("findings")
     if not isinstance(findings, list):
@@ -51,7 +55,9 @@ def detect_recurrence(jobs, repo, current_pr):
             review = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(review, dict):
                 raise ValueError("O registro deve ser um objeto JSON.")
-            if str(review.get("repo", "")).lower() != repo.lower():
+            if not isinstance(review.get("repo"), str) or not review["repo"].strip():
+                raise ValueError("O registro não informa o repositório.")
+            if review["repo"].lower() != repo.lower():
                 if path == current:
                     raise ValueError("O repositório dos votos difere do informado.")
                 continue
@@ -77,8 +83,8 @@ def detect_recurrence(jobs, repo, current_pr):
                 occurrence["evidencia_origem"] = cause["evidence"]
                 by_cause[key].append((occurrence, cause))
             pattern = finding.get("pattern")
-            if isinstance(pattern, str) and pattern.strip():
-                by_pattern[pattern.strip().lower()].append((occurrence, key))
+            if isinstance(pattern, str) and normalize_pattern(pattern):
+                by_pattern[normalize_pattern(pattern)].append((occurrence, key))
 
     for group in by_cause.values():
         prs = {item["pr"] for item, _ in group}
