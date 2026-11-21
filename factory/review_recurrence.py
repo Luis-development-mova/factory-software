@@ -55,8 +55,11 @@ def detect_recurrence(jobs, repo, current_pr):
             review = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(review, dict):
                 raise ValueError("O registro deve ser um objeto JSON.")
-            if not isinstance(review.get("repo"), str) or not review["repo"].strip():
+            repo_value = review.get("repo")
+            if repo_value is None or (isinstance(repo_value, str) and not repo_value.strip()):
                 raise ValueError("O registro não informa o repositório.")
+            if not isinstance(repo_value, str):
+                raise ValueError("O campo repo deve ser texto.")
             if review["repo"].lower() != repo.lower():
                 if path == current:
                     raise ValueError("O repositório dos votos difere do informado.")

@@ -57,6 +57,19 @@ class ReviewRecurrenceTest(unittest.TestCase):
         suspicion, = result["suspeitas"]
         self.assertEqual([item["pr"] for item in suspicion["ocorrencias"]], [8, 10])
 
+    def test_history_file_with_non_text_repo_registers_type_gap(self):
+        self.write_review(8)
+        history = self.jobs / "pr-8-votos.json"
+        review = json.loads(history.read_text())
+        review["repo"] = 123
+        history.write_text(json.dumps(review))
+        self.write_review(10)
+        result = detect_recurrence(self.jobs, "owner/repo", 10)
+        self.assertEqual(result["propostas"], [])
+        self.assertEqual(result["lacunas"], [
+            {"arquivo": "pr-8-votos.json", "motivo": "O campo repo deve ser texto."},
+        ])
+
     def test_unanimous_cause_above_nitpick_limit_still_proposes_fix(self):
         self.write_review(8)
         path = self.jobs / "pr-8-votos.json"
