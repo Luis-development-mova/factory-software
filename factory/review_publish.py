@@ -45,11 +45,18 @@ def publish_summary(api, endpoint, repo, base, head, findings, check_version, re
         return
     reviews_endpoint = f"{endpoint}/reviews"
     marker = f"<!-- factory-review-summary:{base}:{head} -->"
-    prior = next(
-        (review for page in api(reviews_endpoint, paginate=True) for review in page
-         if (review.get("body") or "").endswith(marker)),
-        None,
-    )
+    try:
+        prior = next(
+            (review for page in api(reviews_endpoint, paginate=True) for review in page
+             if (review.get("body") or "").endswith(marker)),
+            None,
+        )
+    except subprocess.CalledProcessError as error:
+        result["estado"] = "pendente"
+        result["pendentes"].extend(
+            {"file": path, "line": line, "motivo": error.stderr.strip()} for path, line in findings
+        )
+        return
     previous = prior["body"].removesuffix(marker).rstrip() if prior else "## Achados fora do diff"
     additions = []
     locations = []
@@ -95,6 +102,15 @@ def publish_review(api, repo, number, review):
         "estado": "concluido", "publicados": [], "existentes": [],
         "pendentes": [], "internos": filtered["internos"],
     }
+    try:
+        _publish(api, repo, number, base, head, filtered, result)
+    except subprocess.CalledProcessError as error:
+        result["estado"] = "pendente"
+        result["pendentes"].append({"motivo": error.stderr.strip()})
+    return result
+
+
+def _publish(api, repo, number, base, head, filtered, result):
     endpoint = f"repos/{repo}/pulls/{number}"
     comments_endpoint = f"{endpoint}/comments"
 

@@ -1,3 +1,4 @@
+import subprocess
 import unittest
 
 from review_publish import publish_review
@@ -12,6 +13,8 @@ class ReviewPublicationTest(unittest.TestCase):
         self.pr = {"state": "open", "base": {"sha": self.base}, "head": {"sha": self.head}}
         self.comments = []
         self.reviews = []
+        self.fail_pr_read_after_comment = False
+        self.fail_reviews_read = False
         self.files = [{"filename": "README.md", "patch": "@@ -1,2 +1,3 @@\n a\n-b\n+B\n+c"}]
         self.votes = [
             {"validator": name, "confirmed": True, "reason": "Confirmado"}
@@ -19,6 +22,10 @@ class ReviewPublicationTest(unittest.TestCase):
         ]
 
     def api(self, endpoint, *, payload=None, paginate=False, method="POST"):
+        if self.fail_pr_read_after_comment and self.comments and endpoint == self.endpoint and payload is None:
+            raise subprocess.CalledProcessError(1, "gh", stderr="HTTP 503")
+        if self.fail_reviews_read and endpoint == self.endpoint + "/reviews" and payload is None:
+            raise subprocess.CalledProcessError(1, "gh", stderr="HTTP 503")
         if endpoint == self.endpoint and payload is None:
             return self.pr
         if endpoint == self.endpoint + "/files":
@@ -111,3 +118,29 @@ class ReviewPublicationTest(unittest.TestCase):
         self.assertIn("**Importante:**", review["body"])
         self.assertIn(f"/blob/{self.head}/factory/intake.py#L11", review["body"])
         self.assertIn(f"/blob/{self.head}/README.md#L51", review["body"])
+
+    def test_removed_line_is_not_commentable_on_new_side(self):
+        self.files = [{"filename": "README.md", "patch": "@@ -1,3 +1,2 @@\n a\n-b\n-c\n+B"}]
+        result = self.publish(self.finding(line=2), self.finding(line=3, label="importante"))
+        self.assertEqual([(c["path"], c["line"]) for c in self.comments], [("README.md", 2)])
+        review, = self.reviews
+        self.assertIn(f"/blob/{self.head}/README.md#L3", review["body"])
+        self.assertEqual(len(result["publicados"]), 2)
+
+    def test_failure_after_published_comment_returns_link_and_pending(self):
+        self.fail_pr_read_after_comment = True
+        result = self.publish(
+            self.finding(line=2),
+            self.finding(line=3, scenario="Outro link", evidence="Outra evidência.", impact="Outro impacto."),
+        )
+        self.assertEqual(result["estado"], "pendente")
+        self.assertEqual(result["publicados"], [{"file": "README.md", "line": 2, "url": "https://example.com/1"}])
+        self.assertEqual(len(self.comments), 1)
+        self.assertIn("HTTP 503", result["pendentes"][0]["motivo"])
+
+    def test_summary_read_failure_keeps_inline_and_marks_outside_pending(self):
+        self.fail_reviews_read = True
+        result = self.publish(self.finding(line=3), self.finding(line=51, label="importante"))
+        self.assertEqual(result["estado"], "pendente")
+        self.assertEqual(len(result["publicados"]), 1)
+        self.assertEqual(result["pendentes"], [{"file": "README.md", "line": 51, "motivo": "HTTP 503"}])
