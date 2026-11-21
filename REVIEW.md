@@ -22,7 +22,7 @@ Quando for falso positivo, registre neste manual um exemplo, a justificativa e a
 
 Para um achado que possa se repetir, o Grupo 1 pode fornecer `pattern`, um identificador curto e consistente do sintoma (ex.: `link-markdown-quebrado`). Quando houver origem demonstrável, inclua `cause` com `file`, `line`, `fragment` (trecho literal que causa a falha), `evidence` (como esse trecho produz o erro no SHA avaliado) e `proposal` (correção na origem). Use a mesma referência para o mesmo defeito, mesmo que os arquivos afetados tenham textos diferentes.
 
-O Grupo 2 registra `cause_confirmed: true` no voto apenas se verificar por conta própria o arquivo, a linha, o trecho e a relação com a falha. O orquestrador preserva esse campo e os campos opcionais do achado no JSON de votos. Se a falha for intencional em uma amostra descartável, deixe-a fora da análise de recorrência omitindo `pattern` e `cause` ou negando a confirmação da causa conforme a evidência.
+O Grupo 2 registra `cause_confirmed: true` no voto apenas se verificar por conta própria o arquivo, a linha, o trecho e a relação com a falha. O orquestrador preserva esse campo e os campos opcionais do achado no JSON de votos. Se a falha for intencional em uma amostra descartável, omita `pattern` e `cause` para excluí-la da análise de recorrência. Se a intenção só for identificada durante a validação, o orquestrador deve remover esses dois campos antes de gravar os votos.
 
 O comando cruza os votos locais do mesmo repositório. Só gera proposta quando PRs distintas têm achados unânimes com a mesma origem confirmada. Sintomas semelhantes cuja origem ainda está em aberto ficam como suspeitas. Registros antigos sem esses campos continuam válidos para a revisão, mas ficam fora da comparação.
 
