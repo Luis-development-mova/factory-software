@@ -76,6 +76,18 @@ def filter_findings(validators, findings):
     return result
 
 
+def accepted_findings(validators, findings):
+    check_validators(validators)
+    if not isinstance(findings, list):
+        raise ValueError("findings deve ser uma lista.")
+    expected = Counter(validators)
+    return [
+        {key: value for key, value in finding.items() if key != "votes"}
+        for finding in findings
+        if _publication_reason(finding, expected) is None
+    ]
+
+
 if __name__ == "__main__":
     try:
         data = json.load(sys.stdin)
