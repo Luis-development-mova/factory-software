@@ -14,6 +14,14 @@ Agentes que não participaram da primeira revisão verificam cada achado por con
 
 Só publique um comentário na PR quando todos os validadores concordarem que o problema é real e que a classificação está correta. Guarde divergências, falta de evidência e votos ausentes no parecer interno.
 
+No parecer, separe a evidência em três subseções de `## Evidência`, sempre presentes (use `Nenhum.` se a lista estiver vazia):
+
+- `### Validado`: o que um agente conferiu no SHA avaliado, com o comando ou a leitura feita.
+- `### Simulado`: o que foi substituído por API falsa, cópia temporária, registro ou amostra descartável. Diga o que foi simulado.
+- `### Pendente`: o que não foi executado, não teve resposta utilizável ou ficou sem fonte.
+
+Não descreva uma simulação como teste ponta a ponta nem como validação no GitHub. `python3 factory/parecer_check.py <parecer>` confere se as três subseções existem.
+
 ## Aprender com apontamentos repetidos
 
 Quando o mesmo problema aparecer em mais de uma PR, confirme a recorrência e proponha uma correção na origem. Use lint ou teste se a regra for verificável. Para orientação de implementação, use `AGENTS.md`, `CLAUDE.md` ou a skill pertinente.
