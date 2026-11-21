@@ -11,6 +11,8 @@ class ReviewPublicationTest(unittest.TestCase):
         self.head = "b" * 40
         self.pr = {"state": "open", "base": {"sha": self.base}, "head": {"sha": self.head}}
         self.comments = []
+        self.reviews = []
+        self.files = [{"filename": "README.md", "patch": "@@ -1,2 +1,3 @@\n a\n-b\n+B\n+c"}]
         self.votes = [
             {"validator": name, "confirmed": True, "reason": "Confirmado"}
             for name in ("V1", "V2")
@@ -19,6 +21,17 @@ class ReviewPublicationTest(unittest.TestCase):
     def api(self, endpoint, *, payload=None, paginate=False, method="POST"):
         if endpoint == self.endpoint and payload is None:
             return self.pr
+        if endpoint == self.endpoint + "/files":
+            return [self.files]
+        if endpoint == self.endpoint + "/reviews":
+            if payload is None:
+                return [self.reviews]
+            review = {**payload, "id": 1, "html_url": "https://example.com/review"}
+            self.reviews.append(review)
+            return review
+        if endpoint == self.endpoint + "/reviews/1" and method == "PUT":
+            self.reviews[0].update(payload)
+            return self.reviews[0]
         if method == "PATCH":
             comment = self.comments[int(endpoint.rsplit("/", 1)[1]) - 1]
             comment.update(payload)
@@ -81,3 +94,20 @@ class ReviewPublicationTest(unittest.TestCase):
         comment, = self.comments
         self.assertEqual(comment["body"].count("Link do manual"), 1)
         self.assertEqual(comment["body"].count("Destino alternativo"), 1)
+
+    def test_off_diff_findings_are_grouped_in_review_summary_without_duplicates(self):
+        inline = self.finding()
+        outside = self.finding(file="factory/intake.py", line=11, label="já existente")
+        outside_hunk = self.finding(line=51, label="importante")
+        self.publish(inline, outside)
+        result = self.publish(inline, outside, outside_hunk)
+        self.assertEqual(len(result["publicados"]), 1)
+        self.assertEqual(len(result["existentes"]), 2)
+        self.assertEqual(len(self.comments), 1)
+        review, = self.reviews
+        self.assertEqual(review["commit_id"], self.head)
+        self.assertEqual(review["event"], "COMMENT")
+        self.assertEqual(review["body"].count("**Já existente:**"), 1)
+        self.assertIn("**Importante:**", review["body"])
+        self.assertIn(f"/blob/{self.head}/factory/intake.py#L11", review["body"])
+        self.assertIn(f"/blob/{self.head}/README.md#L51", review["body"])
