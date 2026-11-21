@@ -8,7 +8,7 @@ from html import escape
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-REPO = "Luis-development-mova/factory-software"
+REPO = "LuisCarlos-SE/factory-software"
 JOBS = Path(__file__).resolve().parent / "jobs"
 STATUSES = {"ready": "Pronto para planejar", "needs-human": "Precisa de você"}
 SCHEMA = {
@@ -114,6 +114,7 @@ def update():
                                "acceptance": acceptance_message})
     content = "\n".join(rows) or "<p>Nenhuma issue aberta com a etiqueta factory.</p>"
     template = (Path(__file__).parent / "painel.html").read_text()
+    template = template.replace("{{repo}}", escape(REPO))
     save(JOBS / "index.html", template.replace("{{updated}}", datetime.now().strftime("%d/%m/%Y %H:%M"))
                                     .replace("{{issues}}", content))
     save_track(track_jobs)
