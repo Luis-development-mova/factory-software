@@ -10,12 +10,12 @@ import sys
 from review_filter import filter_findings
 
 
-def github_api(endpoint, *, payload=None, paginate=False):
+def github_api(endpoint, *, payload=None, paginate=False, method="POST"):
     args = ["gh", "api", "--hostname", "github.com", endpoint]
     if paginate:
         args.extend(["--paginate", "--slurp"])
     if payload is not None:
-        args.extend(["--method", "POST", "--input", "-"])
+        args.extend(["--method", method, "--input", "-"])
     response = subprocess.run(
         args,
         input=json.dumps(payload, ensure_ascii=False) if payload is not None else None,
@@ -55,31 +55,49 @@ def publish_review(api, repo, number, review):
     by_location = {}
     for finding in filtered["publicaveis"]:
         location = (finding["file"], finding["line"])
-        body = f'**{finding["label"].capitalize()}:** {finding["scenario"]}\n\n'
-        body += f'{finding["evidence"]}\n\n{finding["impact"]}'
-        by_location.setdefault(location, []).append(body)
+        label = finding["label"]
+        evidence = finding["evidence"]
+        impact = finding["impact"]
+        identity = [label, " ".join(evidence.split()), " ".join(impact.split())]
+        key = hashlib.sha256(json.dumps(identity).encode()).hexdigest()
+        finding_marker = f"<!-- factory-finding:{key} -->"
+        details = f"{evidence}\n\n{impact}"
+        body = f'**{label.capitalize()}:** {finding["scenario"]}\n\n{details}'
+        by_location.setdefault(location, {})[finding_marker] = (body, details)
 
     if not by_location:
         return result
     existing = [
         comment for page in api(comments_endpoint, paginate=True) for comment in page
     ]
-    for (path, line), bodies in by_location.items():
+    for (path, line), findings in by_location.items():
         # A posição no mesmo commit continua estável quando a redação muda entre rodadas.
         key = hashlib.sha256(json.dumps([base, head, path, line]).encode()).hexdigest()
         marker = f"<!-- factory-review:{key} -->"
         location = {"file": path, "line": line}
         prior = next((item for item in existing if item["body"].endswith(marker)), None)
-        if prior is not None:
+        previous = prior["body"].removesuffix(marker).rstrip() if prior else ""
+        legacy = previous.split("<!-- factory-finding:", 1)[0]
+        additions = [
+            f"{body}\n\n{finding_marker}"
+            for finding_marker, (body, details) in findings.items()
+            if finding_marker not in previous
+            and details not in legacy
+        ]
+        if prior is not None and not additions:
             result["existentes"].append({**location, "url": prior["html_url"]})
             continue
         if not check_version():
             break
         try:
-            comment = api(comments_endpoint, payload={
-                "body": "\n\n".join(dict.fromkeys(bodies)) + f"\n\n{marker}",
-                "path": path, "line": line, "side": "RIGHT", "commit_id": head,
-            })
+            body = "\n\n".join(filter(None, [previous, *additions, marker]))
+            if prior is None:
+                comment = api(comments_endpoint, payload={
+                    "body": body, "path": path, "line": line, "side": "RIGHT", "commit_id": head,
+                })
+            else:
+                comment = api(f"repos/{repo}/pulls/comments/{prior['id']}",
+                              payload={"body": body}, method="PATCH")
         except subprocess.CalledProcessError as error:
             result["estado"] = "pendente"
             result["pendentes"].append({**location, "motivo": error.stderr.strip()})
