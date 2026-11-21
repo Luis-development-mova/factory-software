@@ -24,9 +24,12 @@ Quando for falso positivo, registre neste manual um exemplo, a justificativa e a
 
 No Claude Code, execute `/factory review <n>` para revisar uma PR. O orquestrador grava os votos e o parecer local em `factory/jobs/`, com os SHAs avaliados. O parecer contém as minutas dos achados unânimes e o registro dos achados internos.
 
-Execute `python3 factory/review_filter.py < votos.json`. O orquestrador deve fixar o grupo antes da votação e fornecer `validators` com os identificadores dos validadores e `findings` com os achados. Cada achado tem `file`, `line`, `scenario`, `evidence`, `impact`, `label` e `votes`. Cada voto tem `validator`, `confirmed` (verdadeiro apenas se confirma o problema e sua classificação) e `reason`.
+Execute `python3 factory/review_filter.py < votos.json`. O orquestrador deve fixar o grupo antes da votação e fornecer `validators`, uma lista de identificadores distintos com pelo menos dois itens, e `findings` com os achados. Cada achado tem `file`, `line`, `scenario`, `evidence`, `impact`, `label`, `revisor` (identificador do revisor de origem, como `R1` ou `R2`) e `votes`. Cada voto tem `validator`, `confirmed` (verdadeiro apenas se confirma o problema e sua classificação) e `reason`.
 
 Use a lista `publicaveis` para preparar comentários e guarde `internos` no parecer. O comando devolve as listas sem publicar no GitHub.
 
 - Um achado com arquivo, linha e impacto confirmados por todos gera um comentário.
 - Um achado com voto divergente ou ausente fica no parecer interno.
+- Um achado malformado vai para `internos` com o motivo; os demais achados continuam sendo avaliados.
+- No máximo três `nitpick` por revisor entram em `publicaveis`; o excedente vai para `internos`. `importante` e `já existente` não contam para o limite.
+- Se `validators` não for uma lista de identificadores distintos, o filtro encerra com erro e nenhuma lista é devolvida.
