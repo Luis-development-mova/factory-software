@@ -30,7 +30,7 @@ O script do filtro devolve `publicaveis` e `internos`. No fluxo `/factory review
 
 Comece o texto de cada minuta com o rótulo aprovado em negrito (`**Importante:**`, `**Nitpick:**` ou `**Já existente:**`). Preserve esse prefixo no comentário publicado no GitHub para que a classificação fique visível na PR.
 
-Achados na mesma linha são reunidos em um comentário por versão revisada. Uma nova execução reconhece esse comentário. Se o GitHub rejeitar a linha ou a publicação falhar, registre a pendência no parecer.
+Achados na mesma linha são reunidos em um comentário por versão revisada. Uma nova execução preserva os achados já publicados e acrescenta ao comentário existente os novos achados unânimes da mesma linha e versão. Se o GitHub rejeitar a linha ou a publicação falhar, registre a pendência no parecer.
 
 - Um achado com arquivo, linha e impacto confirmados por todos gera um comentário.
 - Um achado com voto divergente ou ausente fica no parecer interno.
