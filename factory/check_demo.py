@@ -66,14 +66,25 @@ def check_panel_link():
         return "Aceite da issue #3 falhou: o destino não mostrou o painel da triagem."
 
 
+def check_operation_note():
+    dom = read_browser_dom(PAGE)
+    if not re.search(
+        r'<a\b[^>]*>Ver o painel</a>[\s\S]*?<footer\b[^>]*>\s*'
+        r'<p>Acompanhe a operação na esteira da fábrica\.</p>\s*</footer>',
+        dom,
+    ):
+        return "Aceite da issue #22 falhou: falta a nota de operação no rodapé abaixo de “Ver o painel”."
+
+
 CHECKS = {1: check_greeting, 2: check_subtitle, 3: check_panel_link}
+ACCEPTANCE_CHECKS = {22: check_operation_note}
 
 
 def main():
     parser = argparse.ArgumentParser(description="Executa o teste de aceite local de uma issue.")
     parser.add_argument("issue", type=int, nargs="?", default=1)
     number = parser.parse_args().issue
-    check = CHECKS.get(number)
+    check = ACCEPTANCE_CHECKS.get(number) or CHECKS.get(number)
     if check is None:
         sys.exit(f"A issue #{number} ainda não tem teste de aceite cadastrado.")
 
