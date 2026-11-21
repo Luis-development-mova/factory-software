@@ -124,7 +124,7 @@ def update():
 
 
 def save_track(jobs):
-    template = (Path(__file__).resolve().parent.parent / "dashboard" / "prototype-esteira.html").read_text()
+    template = (Path(__file__).resolve().parent.parent / "dashboard" / "esteira-template.html").read_text()
     jobs = [{**job, "issueUrl": f"https://github.com/{REPO}/issues/{job['id']}"} for job in jobs]
     payload = json.dumps(jobs).replace("<", "\\u003c")
     save(JOBS / "esteira.html", template.replace("/* FACTORY_DATA */ null", payload, 1))
