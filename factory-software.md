@@ -2,7 +2,7 @@
 
 ## Executar a primeira entrega
 
-Na raiz deste projeto, abra o Claude Code e execute `/factory run`. É preciso ter Python 3, Claude Code autenticado e GitHub CLI (`gh`) com acesso de leitura a `Luis-development-mova/factory-software`.
+Na raiz deste projeto, abra o Claude Code e execute `/factory run`. É preciso ter Python 3, Claude Code autenticado e GitHub CLI (`gh`) com acesso de leitura a `LuisCarlos-SE/factory-software`.
 
 Abra o painel local indicado ao fim do comando (`factory/jobs/index.html`). Ele lista as issues abertas com a etiqueta `factory`. Cada linha mostra o critério de aceite ou a pergunta que falta responder. Execute o comando novamente e recarregue o painel para atualizar a lista. Os resultados ficam no computador em `factory/jobs/`.
 
