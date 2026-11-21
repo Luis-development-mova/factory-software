@@ -22,13 +22,15 @@ Quando for falso positivo, registre neste manual um exemplo, a justificativa e a
 
 ## Como validar o filtro
 
-No Claude Code, execute `/factory review <n>` para revisar uma PR. O orquestrador grava os votos e o parecer local em `factory/jobs/`, com os SHAs avaliados. O parecer contém as minutas dos achados unânimes e o registro dos achados internos.
+No Claude Code, execute `/factory review <n>` para revisar uma PR. O orquestrador grava os votos e o parecer local em `factory/jobs/`, com os SHAs avaliados. O parecer contém as minutas, os achados internos e o resultado da publicação.
 
 Execute `python3 factory/review_filter.py < votos.json`. O orquestrador deve fixar o grupo antes da votação e fornecer `validators`, uma lista de identificadores distintos com pelo menos dois itens, e `findings` com os achados. Cada achado tem `file`, `line`, `scenario`, `evidence`, `impact`, `label`, `revisor` (identificador do revisor de origem, como `R1` ou `R2`) e `votes`. Cada voto tem `validator`, `confirmed` (verdadeiro apenas se confirma o problema e sua classificação) e `reason`.
 
-Use a lista `publicaveis` para preparar comentários e guarde `internos` no parecer. O comando devolve as listas sem publicar no GitHub.
+O script do filtro devolve `publicaveis` e `internos`. No fluxo `/factory review`, o publicador usa os votos para aplicar o mesmo filtro e envia automaticamente os achados unânimes a uma PR aberta, inclusive em rascunho, enquanto a base e a versão revisada corresponderem aos SHAs do parecer. A conta do `gh` precisa ter permissão para publicar comentários.
 
 Comece o texto de cada minuta com o rótulo aprovado em negrito (`**Importante:**`, `**Nitpick:**` ou `**Já existente:**`). Preserve esse prefixo no comentário publicado no GitHub para que a classificação fique visível na PR.
+
+Achados na mesma linha são reunidos em um comentário por versão revisada. Uma nova execução preserva os achados já publicados e acrescenta ao comentário existente os novos achados unânimes da mesma linha e versão. Se o GitHub rejeitar a linha ou a publicação falhar, registre a pendência no parecer.
 
 - Um achado com arquivo, linha e impacto confirmados por todos gera um comentário.
 - Um achado com voto divergente ou ausente fica no parecer interno.
