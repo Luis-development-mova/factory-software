@@ -24,7 +24,18 @@ def remote_base_sha(remote):
     return fields[0]
 
 
-def check_approval(record, base, diff, remote_base):
+def logged(record, events):
+    verdicts = [(event.get("agent_id"), event.get("verdict") or {}) for event in events]
+    approved = any(
+        agent == record.get("approver_session") and verdict.get("decision") == "APROVADO"
+        and verdict.get("base_sha") == record.get("base_sha")
+        and verdict.get("diff_sha256") == record.get("diff_sha256")
+        for agent, verdict in verdicts
+    )
+    return approved and any(agent == record.get("reviewer_session") for agent, _ in verdicts)
+
+
+def check_approval(record, base, diff, remote_base, events):
     if not isinstance(record, dict) or record.get("decision") != "APROVADO":
         raise ValueError("Falta um parecer independente APROVADO.")
     if record.get("origin") != ORIGIN or record.get("approval_event") != "SubagentStop":
@@ -35,6 +46,8 @@ def check_approval(record, base, diff, remote_base):
     normalized = [session.strip().casefold() for session in sessions]
     if len(set(normalized)) != len(normalized):
         raise ValueError("Builder, revisor e aprovador devem ser sessões distintas.")
+    if not logged(record, events):
+        raise ValueError("O registro não confere com o log de eventos do Claude Code.")
     if not re.fullmatch(r"[0-9a-f]{40}", base) or record.get("base_sha") != base:
         raise ValueError("A base informada difere da base avaliada no registro.")
     if remote_base != base:
@@ -51,7 +64,9 @@ def main():
     args = parser.parse_args()
     try:
         record = json.loads(args.record.read_text(encoding="utf-8"))
-        check_approval(record, args.base, sys.stdin.buffer.read(), remote_base_sha(args.remote))
+        log = args.record.with_name("aprovacao-eventos.jsonl")
+        events = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()] if log.exists() else []
+        check_approval(record, args.base, sys.stdin.buffer.read(), remote_base_sha(args.remote), events)
     except (OSError, ValueError) as error:
         sys.exit(f"Abertura da PR pendente: {error}")
     print("Aprovação independente confere com a base remota e o diff.")
