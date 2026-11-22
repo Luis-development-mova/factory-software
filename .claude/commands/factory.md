@@ -37,8 +37,20 @@ disable-model-invocation: true
 ## Decisão local
 
 1. Classifique o risco pelo diff e siga a regra de leitura de Luis em `factory-software.md` (etapa 07). Se precisar dessa leitura ou se o risco for incerto, registre `ESCALAR` e informe qual decisão falta.
-2. Quando a leitura de Luis puder esperar pela PR, rode novamente `python3 factory/checks.py` sobre os arquivos avaliados. Inicie um aprovador em sessão separada, distinto do Builder e do revisor local. Entregue o critério, o diff, o parecer do revisor e os checks reexecutados. Peça uma decisão explícita e justificada após conferir o critério e o limite de 300 linhas. Para `build <n>`, prepare o diff dos arquivos revisados conforme **Abertura da PR** e entregue esse mesmo diff ao aprovador. Grave a justificativa no parecer local e, somente após receber a aprovação real, grave `factory/jobs/<n>-aprovacao.json` com `decision: "APROVADO"`, `origin`, `builder_session`, `reviewer_session`, `approver_session`, `base_sha` e `diff_sha256`. Use os identificadores retornados pelo orquestrador, `origin: "orquestrador"` e o SHA-256 dos bytes do diff entregue ao aprovador. O verificador confere a forma do registro, a distinção entre Builder, revisor e aprovador, a base e o diff; ele não prova que as sessões existem, essa garantia depende do orquestrador. Se faltar a confirmação ou um identificador, não grave o registro e registre `ESCALAR`. Se o diff mudar desde a revisão, encaminhe à revisão novamente antes da decisão.
+2. Quando a leitura de Luis puder esperar pela PR, rode novamente `python3 factory/checks.py` sobre os arquivos avaliados. Para `build <n>`, siga **Captura da aprovação**. Fora do build, peça a decisão a um aprovador em sessão separada e registre a justificativa no parecer local. Se o diff mudar desde a revisão, encaminhe à revisão novamente antes da decisão.
 3. Grave a decisão em `factory/jobs/<n>-decisao.md` com o risco, as evidências e a ação seguinte. Use `PRONTO` se o escopo, o aceite, os checks e a revisão estiverem confirmados, `VOLTAR` se houver correção de código ou check e `ESCALAR` se faltar decisão humana, evidência de aceite ou aprovador. Informe a decisão e o caminho do arquivo.
+
+## Captura da aprovação
+
+Para `build <n>`, antes do commit e do push:
+
+1. Crie `factory/jobs/aprovacao-em-curso.json` com `base_sha` (remoto atual, `git ls-remote origin HEAD`), `diff_path` e `diff_sha256` do diff gerado na **Abertura da PR**, `builder_session` (sessão do Builder), `reviewer_agent_type` `revisor-local`, `approver_agent_type` `aprovador-independente` e `record_path` `factory/jobs/<n>-aprovacao.json`. Apague `factory/jobs/aprovacao-eventos.jsonl` se existir.
+2. Inicie o revisor `revisor-local` com o diff e aguarde o fim. Inicie o aprovador `aprovador-independente` com o caminho do diff, a base e o SHA-256. Ele não recebe o parecer do revisor.
+3. O hook do projeto (`.claude/settings.json`, evento `SubagentStop`, `factory/approval_capture.py`) lê o `agent_id` emitido pelo Claude Code e grava `<n>-aprovacao.json`. O registro vincula o aprovador por `approver_session`, o revisor pelo último evento `revisor-local`, a base e o SHA-256 do diff. Se o evento, o ID, a sessão de origem ou o vínculo faltar ou divergir, o registro sai como `ESCALAR` com `reasons`.
+4. Leia `<n>-aprovacao.json`. `APROVADO` libera o `build_approval.py` e, com saída zero, o push e a abertura do rascunho. `VOLTAR` mantém o trabalho local para correção e encerra antes do push. `ESCALAR` ou ausência do registro encerra antes do push e vai para `<n>-decisao.md`.
+5. Remova `aprovacao-em-curso.json` ao final, com ou sem aprovação.
+
+O verificador confere a forma do registro, a origem `claude-code-hook` com evento `SubagentStop`, a distinção entre Builder, revisor e aprovador, a base remota e o diff. Ele não prova que a sessão existe além do que o Claude Code emitiu no evento.
 
 ## Preparação da PR
 
