@@ -10,7 +10,7 @@ Quando uma issue está pronta, clique em **Abrir plano da Fase 0**. O plano desc
 
 O `/factory run` também conduz as issues prontas com teste cadastrado. O Claude Code roda o teste antes de editar. Se o critério já estiver atendido, segue para a próxima issue. Se o teste falhar pelo motivo esperado, o Builder faz a mudança e roda o mesmo teste de novo. Use `/factory build <n>` para trabalhar em uma só issue.
 
-O `/factory build <n>` reutiliza uma PR aberta da issue ou abre uma em rascunho quando a implementação nova recebe parecer `PRONTO`. A descrição usa o template do repositório e inclui o critério de aceite, os testes e as lacunas. Os pareceres `VOLTAR` e `ESCALAR` registram o motivo e encerram a execução antes de abrir uma PR. O merge depende da autorização de Luis.
+O `/factory build <n>` reutiliza uma PR aberta da issue ou abre uma em rascunho quando a implementação nova recebe parecer `PRONTO` e uma aprovação independente, com sessão própria distinta do Builder e do revisor. Antes do commit e do push, `factory/build_approval.py` confere o registro, a base remota atual e o SHA-256 do diff; sem essa conferência, a PR não é aberta. A descrição usa o template do repositório e inclui o critério de aceite, os testes e as lacunas. Os pareceres `VOLTAR` e `ESCALAR` registram o motivo e encerram a execução antes de abrir uma PR. O merge depende da autorização de Luis.
 
 ## A ideia em poucas palavras
 
