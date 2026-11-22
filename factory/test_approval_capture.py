@@ -94,10 +94,11 @@ class ApprovalCaptureTest(unittest.TestCase):
                     build_approval.check_approval(record, BASE, DIFF, BASE)
                 self.record_path.unlink()
 
-    def test_escalates_without_reviewer_event(self):
-        record = self.run_hook(self.event())
-        self.assertEqual(record["decision"], "ESCALAR")
-        self.assertIn("evento do revisor ausente", record["reasons"])
+    def test_approver_before_reviewer_still_links_once_both_events_exist(self):
+        self.assertIsNone(self.run_hook(self.event()))
+        record = self.run_hook(self.reviewer_event())
+        self.assertEqual(record["decision"], "APROVADO")
+        self.assertEqual(record["reviewer_session"], "reviewer-agent")
 
 
 if __name__ == "__main__":
