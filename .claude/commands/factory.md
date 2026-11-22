@@ -50,7 +50,7 @@ Para `build <n>`, antes do commit e do push:
 4. Leia `<n>-aprovacao.json`. `APROVADO` libera o `build_approval.py` e, com saída zero, o push e a abertura do rascunho. `VOLTAR` mantém o trabalho local para correção e encerra antes do push. `ESCALAR` ou ausência do registro encerra antes do push e vai para `<n>-decisao.md`.
 5. Remova `aprovacao-em-curso.json` ao final, com ou sem aprovação.
 
-O verificador confere a forma do registro, a origem `claude-code-hook` com evento `SubagentStop`, a distinção entre Builder, revisor e aprovador, a base remota e o diff. Ele não prova que a sessão existe além do que o Claude Code emitiu no evento.
+O verificador confere a forma do registro, a origem `claude-code-hook` com evento `SubagentStop`, a distinção entre Builder, revisor e aprovador, a base remota e o diff. Ele também confere o registro com `factory/jobs/aprovacao-eventos.jsonl`: sem evento correspondente do aprovador e do revisor, recusa. Um registro gravado à mão não passa. Quem tem escrita local pode alterar o log; o gate confere consistência com a captura, não prova criptográfica.
 
 ## Preparação da PR
 
