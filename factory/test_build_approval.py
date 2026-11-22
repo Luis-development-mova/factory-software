@@ -74,7 +74,7 @@ class BuildApprovalTest(unittest.TestCase):
         self.assertIn(b"base remota atual difere", result.stdout + result.stderr)
 
     def test_rejects_approval_without_verifiable_origin(self):
-        # Prova só a forma do registro: origem ausente ou diferente de "orquestrador" é recusada.
+        # Prova só a forma do registro: origem ausente, de outro tipo ou de evento diferente de SubagentStop é recusada.
         for changes in ({"origin": None}, {"origin": "orquestrador"}, {"approval_event": "manual"}):
             with self.subTest(changes=changes):
                 self.write_record(**changes)
