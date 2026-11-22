@@ -8,25 +8,45 @@ import unittest
 
 
 SCRIPT = Path(__file__).with_name("build_approval.py")
+IDENTITY = ["-c", "user.name=teste", "-c", "user.email=teste@example.com"]
+
+
+def git(*args, cwd):
+    return subprocess.run(
+        ["git", *IDENTITY, *args], cwd=cwd, capture_output=True, text=True, check=True,
+    ).stdout.strip()
 
 
 class BuildApprovalTest(unittest.TestCase):
     def setUp(self):
         directory = TemporaryDirectory()
         self.addCleanup(directory.cleanup)
-        self.record_path = Path(directory.name) / "approval.json"
-        self.base = "a" * 40
+        root = Path(directory.name)
+        self.remote = root / "remote.git"
+        self.work = root / "work"
+        git("init", "-q", "--bare", str(self.remote), cwd=root)
+        git("symbolic-ref", "HEAD", "refs/heads/main", cwd=self.remote)
+        git("init", "-q", str(self.work), cwd=root)
+        git("remote", "add", "origin", str(self.remote), cwd=self.work)
+        self.publish("primeiro")
+        self.base = git("rev-parse", "HEAD", cwd=self.work)
+        self.record_path = root / "approval.json"
         self.diff = b"reviewed patch\n"
         self.record = {
-            "decision": "APROVADO", "reviewer_session": "reviewer-session",
+            "decision": "APROVADO", "origin": "orquestrador",
+            "builder_session": "builder-session", "reviewer_session": "reviewer-session",
             "approver_session": "approver-session", "base_sha": self.base,
             "diff_sha256": hashlib.sha256(self.diff).hexdigest(),
         }
 
+    def publish(self, message):
+        git("commit", "-q", "--allow-empty", "-m", message, cwd=self.work)
+        git("push", "-q", "origin", "HEAD:refs/heads/main", cwd=self.work)
+
     def run_gate(self, diff=None, base=None):
         return subprocess.run(
             [sys.executable, str(SCRIPT), str(self.record_path), base or self.base],
-            input=self.diff if diff is None else diff, capture_output=True,
+            input=self.diff if diff is None else diff, capture_output=True, cwd=self.work,
         )
 
     def write_record(self, **changes):
@@ -40,14 +60,42 @@ class BuildApprovalTest(unittest.TestCase):
         result = self.run_gate()
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_rejects_changed_version_or_invalid_approval(self):
+    def test_rejects_changed_diff_or_base_informed_by_executor(self):
         self.write_record()
         self.assertNotEqual(self.run_gate(diff=b"changed patch").returncode, 0)
         self.assertNotEqual(self.run_gate(base="b" * 40).returncode, 0)
+
+    def test_rejects_base_moved_on_remote_even_when_executor_informs_old_base(self):
+        # Prova que o gate consulta o remoto: a base informada e a do registro são as antigas.
+        self.write_record()
+        self.publish("segundo")
+        result = self.run_gate()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(b"base remota atual difere", result.stdout + result.stderr)
+
+    def test_rejects_approval_without_verifiable_origin(self):
+        # Prova só a forma do registro: origem ausente ou diferente de "orquestrador" é recusada.
+        for changes in ({"origin": None}, {"origin": ""}, {"origin": "aprovador-local"}):
+            with self.subTest(changes=changes):
+                self.write_record(**changes)
+                result = self.run_gate()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("origem verificável", (result.stdout + result.stderr).decode())
+
+    def test_rejects_invalid_or_shared_sessions(self):
         for changes in (
-            {"decision": "VOLTAR"}, {"approver_session": ""},
+            {"decision": "VOLTAR"},
+            {"approver_session": ""},
+            {"builder_session": None},
             {"approver_session": self.record["reviewer_session"]},
+            {"approver_session": self.record["builder_session"]},
+            {"approver_session": " Builder-Session "},
+            {"reviewer_session": self.record["builder_session"]},
         ):
             with self.subTest(changes=changes):
                 self.write_record(**changes)
                 self.assertNotEqual(self.run_gate().returncode, 0)
+
+
+if __name__ == "__main__":
+    unittest.main()
