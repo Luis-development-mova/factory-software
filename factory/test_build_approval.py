@@ -33,7 +33,7 @@ class BuildApprovalTest(unittest.TestCase):
         self.record_path = root / "approval.json"
         self.diff = b"reviewed patch\n"
         self.record = {
-            "decision": "APROVADO", "origin": "orquestrador",
+            "decision": "APROVADO", "origin": "claude-code-hook", "approval_event": "SubagentStop",
             "builder_session": "builder-session", "reviewer_session": "reviewer-session",
             "approver_session": "approver-session", "base_sha": self.base,
             "diff_sha256": hashlib.sha256(self.diff).hexdigest(),
@@ -75,7 +75,7 @@ class BuildApprovalTest(unittest.TestCase):
 
     def test_rejects_approval_without_verifiable_origin(self):
         # Prova só a forma do registro: origem ausente ou diferente de "orquestrador" é recusada.
-        for changes in ({"origin": None}, {"origin": ""}, {"origin": "aprovador-local"}):
+        for changes in ({"origin": None}, {"origin": "orquestrador"}, {"approval_event": "manual"}):
             with self.subTest(changes=changes):
                 self.write_record(**changes)
                 result = self.run_gate()

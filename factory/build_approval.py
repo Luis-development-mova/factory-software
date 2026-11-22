@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 
-ORIGIN = "orquestrador"
+ORIGIN = "claude-code-hook"
 SESSION_FIELDS = ("builder_session", "reviewer_session", "approver_session")
 
 
@@ -27,8 +27,8 @@ def remote_base_sha(remote):
 def check_approval(record, base, diff, remote_base):
     if not isinstance(record, dict) or record.get("decision") != "APROVADO":
         raise ValueError("Falta um parecer independente APROVADO.")
-    if record.get("origin") != ORIGIN:
-        raise ValueError("A aprovação não tem origem verificável: o registro deve vir do orquestrador.")
+    if record.get("origin") != ORIGIN or record.get("approval_event") != "SubagentStop":
+        raise ValueError("A aprovação não tem origem verificável: o registro deve vir do evento SubagentStop.")
     sessions = [record.get(key) for key in SESSION_FIELDS]
     if not all(isinstance(session, str) and session.strip() for session in sessions):
         raise ValueError("Registre os identificadores do Builder, do revisor e do aprovador.")
