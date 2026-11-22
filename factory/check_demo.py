@@ -77,7 +77,33 @@ def check_operation_note():
 
 
 CHECKS = {1: check_greeting, 2: check_subtitle, 3: check_panel_link}
-ACCEPTANCE_CHECKS = {22: check_operation_note}
+class PageDescription(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.in_head = False
+        self.descriptions = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "head":
+            self.in_head = True
+        if self.in_head and tag == "meta":
+            attributes = dict(attrs)
+            if (attributes.get("name") or "").lower() == "description":
+                self.descriptions.append(attributes.get("content"))
+
+    def handle_endtag(self, tag):
+        if tag == "head":
+            self.in_head = False
+
+
+def check_page_description():
+    parser = PageDescription()
+    parser.feed(PAGE.read_text(encoding="utf-8"))
+    if parser.descriptions != ["Acompanhe a triagem e a esteira da fábrica de software."]:
+        return "Aceite da issue #26 falhou: o cabeçalho precisa conter uma única descrição com o texto solicitado."
+
+
+ACCEPTANCE_CHECKS = {22: check_operation_note, 26: check_page_description}
 
 
 def main():
