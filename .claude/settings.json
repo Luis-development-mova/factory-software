@@ -10,6 +10,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "SubagentHandback",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I \"$CLAUDE_PROJECT_DIR/factory/approval_capture.py\"",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }
