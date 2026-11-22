@@ -18,40 +18,25 @@ def parse_verdict(text):
     return verdict if isinstance(verdict, dict) else None
 
 
-def handback(path):
-    if not path or not Path(path).exists():
-        return None
-    found = None
-    for entry in map(json.loads, Path(path).read_text(encoding="utf-8").splitlines()):
-        parts = (entry.get("message") or {}).get("content")
-        for part in parts if isinstance(parts, list) else []:
-            if isinstance(part, dict) and part.get("name") == "SubagentHandback":
-                found = {"message": part.get("input", {}).get("message"),
-                         "agent_id": entry.get("agentId"), "session_id": entry.get("sessionId")}
-    return found
-
-
-def resolve(payload):
-    hand = handback(payload.get("agent_transcript_path"))
+def resolve(payload, events):
+    bound = [e for e in events if e.get("kind") == "SubagentHandback"
+             and e.get("agent_id") == payload.get("agent_id") and e.get("session_id") == payload.get("session_id")]
     sources = {"last_assistant_message": parse_verdict(payload.get("last_assistant_message")),
-               "SubagentHandback.input.message": parse_verdict(hand and hand["message"])}
+               "SubagentHandback.tool_input.message": parse_verdict(bound[-1].get("message")) if bound else None}
     found = {name: value for name, value in sources.items() if value}
     if not found:
-        return None, "decisão ausente", hand
+        return None, "decisão ausente"
     if len({tuple(value.get(field) for field in FIELDS) for value in found.values()}) > 1:
-        return None, "fontes divergentes: " + ", ".join(found), hand
-    return next(iter(found.values())), "+".join(found), hand
+        return None, "fontes divergentes: " + ", ".join(found)
+    return next(iter(found.values())), "+".join(found)
 
 
 def decide(approver, reviewer, context):
-    hand = approver.get("handback") or {}
-    ids = {approver.get("agent_id"), approver.get("transcript_agent_id"), hand.get("agent_id")} - {None}
-    sessions = {approver.get("session_id"), hand.get("session_id")} - {None}
     computed = hashlib.sha256(Path(context["diff_path"]).read_bytes()).hexdigest()
     verdict, reasons = approver.get("verdict"), []
-    if ids != {approver.get("agent_id")} or approver.get("agent_id") is None:
-        reasons.append("agent_id ausente ou divergente entre evento e transcrição")
-    if sessions != {context["builder_session"]}:
+    if not approver.get("agent_id"):
+        reasons.append("evento sem agent_id")
+    if approver.get("session_id") != context["builder_session"]:
         reasons.append("sessão de origem difere do Builder")
     if computed != context["diff_sha256"]:
         reasons.append("diff em disco difere do registrado")
@@ -63,11 +48,15 @@ def decide(approver, reviewer, context):
         reasons.append("SHA-256 informado pelo aprovador difere do diff")
     elif verdict.get("decision") not in DECISIONS:
         reasons.append("decisão fora de APROVADO/VOLTAR")
-    decision = verdict["decision"] if not reasons else "ESCALAR"
-    return {"decision": decision, "origin": "claude-code-hook", "approval_event": "SubagentStop",
-            "approver_session": approver.get("agent_id"), "reviewer_session": reviewer.get("agent_id"),
-            "builder_session": context["builder_session"], "base_sha": context["base_sha"],
-            "diff_sha256": context["diff_sha256"], "reasons": reasons}
+    return {"decision": "ESCALAR" if reasons else verdict["decision"], "origin": "claude-code-hook",
+            "approval_event": "SubagentStop", "approver_session": approver.get("agent_id"),
+            "reviewer_session": reviewer.get("agent_id"), "builder_session": context["builder_session"],
+            "base_sha": context["base_sha"], "diff_sha256": context["diff_sha256"], "reasons": reasons}
+
+
+def append(path, event):
+    with path.open("a", encoding="utf-8") as log:
+        log.write(json.dumps(event, ensure_ascii=False) + "\n")
 
 
 def main():
@@ -77,14 +66,18 @@ def main():
     if not (jobs / "aprovacao-em-curso.json").exists():
         return
     context = json.loads((jobs / "aprovacao-em-curso.json").read_text(encoding="utf-8"))
+    log = jobs / "aprovacao-eventos.jsonl"
+    events = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()] if log.exists() else []
+    if payload.get("hook_event_name") == "PostToolUse":
+        if payload.get("tool_name") == "SubagentHandback":
+            append(log, {"kind": "SubagentHandback", "agent_id": payload.get("agent_id"),
+                         "session_id": payload.get("session_id"), "message": (payload.get("tool_input") or {}).get("message")})
+        return
     event = {key: payload.get(key) for key in ("agent_id", "agent_type", "session_id")}
-    transcript = payload.get("agent_transcript_path")
     if event["agent_type"] == context["approver_agent_type"]:
-        event["verdict"], event["verdict_note"], event["handback"] = resolve(payload)
-        event["transcript_agent_id"] = Path(transcript).stem.removeprefix("agent-") if transcript else None
-    with (jobs / "aprovacao-eventos.jsonl").open("a", encoding="utf-8") as log:
-        log.write(json.dumps(event, ensure_ascii=False) + "\n")
-    events = [json.loads(line) for line in (jobs / "aprovacao-eventos.jsonl").read_text(encoding="utf-8").splitlines()]
+        event["verdict"], event["verdict_note"] = resolve(payload, events)
+    append(log, event)
+    events.append(event)
     approvers = [e for e in events if e.get("agent_type") == context["approver_agent_type"]]
     reviewers = [e for e in events if e.get("agent_type") == context["reviewer_agent_type"] and e.get("agent_id")]
     if approvers and reviewers:

@@ -40,12 +40,10 @@ class ApprovalCaptureTest(unittest.TestCase):
         return {"cwd": str(self.root), "session_id": "builder-session", "agent_id": "reviewer-agent",
                 "agent_type": "revisor-local"}
 
-    def handback(self, message, agent_id="approver-agent", session_id="builder-session", file_id=None):
-        path = self.root / f"agent-{file_id or agent_id}.jsonl"
-        entry = {"agentId": agent_id, "sessionId": session_id, "message": {"role": "assistant", "content": [
-            {"type": "tool_use", "name": "SubagentHandback", "input": {"message": message}}]}}
-        path.write_text(json.dumps(entry) + "\n", encoding="utf-8")
-        return str(path)
+    def post(self, message, agent_id="approver-agent", session_id="builder-session"):
+        return {"hook_event_name": "PostToolUse", "tool_name": "SubagentHandback", "cwd": str(self.root),
+                "agent_id": agent_id, "agent_type": "aprovador-independente", "session_id": session_id,
+                "tool_input": {"message": message}}
 
     def run_hook(self, *events):
         for event in events:
@@ -95,34 +93,28 @@ class ApprovalCaptureTest(unittest.TestCase):
         self.assertEqual(self.run_hook(self.reviewer())["reviewer_session"], "reviewer-agent")
 
     def test_handback_delivery_links_id_session_base_and_diff(self):
-        path = self.handback(self.verdict())
-        record = self.run_hook(self.reviewer(), self.approver(last_assistant_message=None, agent_transcript_path=path))
+        record = self.run_hook(self.post(self.verdict()), self.reviewer(), self.approver(last_assistant_message=None))
         self.assertEqual((record["decision"], record["approver_session"], record["reasons"]), ("APROVADO", "approver-agent", []))
         self.passes_gate(record)
 
     def test_both_delivery_forms_agreeing_link_once(self):
-        path = self.handback(self.verdict())
-        record = self.run_hook(self.reviewer(), self.approver(agent_transcript_path=path))
+        record = self.run_hook(self.post(self.verdict()), self.reviewer(), self.approver())
         self.assertEqual(record["decision"], "APROVADO")
-        self.assertEqual(self.log()[-1]["verdict_note"], "last_assistant_message+SubagentHandback.input.message")
+        self.assertEqual(self.log()[-1]["verdict_note"], "last_assistant_message+SubagentHandback.tool_input.message")
 
     def test_divergent_delivery_forms_escalate(self):
-        path = self.handback(self.verdict(diff_sha256="b" * 64))
-        record = self.run_hook(self.reviewer(), self.approver(agent_transcript_path=path))
+        record = self.run_hook(self.post(self.verdict(diff_sha256="b" * 64)), self.reviewer(), self.approver())
         self.assertEqual(record["decision"], "ESCALAR")
         self.assertTrue(any("fontes divergentes" in reason for reason in record["reasons"]))
 
-    def test_handback_id_or_session_different_from_event_escalates(self):
-        cases = {"agent_id": ({"agent_id": "other-agent"}, "agent_id ausente ou divergente"),
-                 "session": ({"session_id": "other-session"}, "sessão de origem difere do Builder")}
-        for name, (changes, reason) in cases.items():
+    def test_handback_not_bound_to_approver_or_session_escalates(self):
+        cases = {"agent_id": {"agent_id": "other-agent"}, "session": {"session_id": "other-session"}}
+        for name, changes in cases.items():
             with self.subTest(name):
-                path = self.handback(self.verdict(), file_id="approver-agent", **changes)
-                record = self.run_hook(self.reviewer(), self.approver(last_assistant_message=None, agent_transcript_path=path))
+                record = self.run_hook(self.post(self.verdict(), **changes), self.reviewer(), self.approver(last_assistant_message=None))
                 self.assertEqual(record["decision"], "ESCALAR")
-                self.assertTrue(any(reason in r for r in record["reasons"]), record["reasons"])
+                self.assertIn("decisão ausente", record["reasons"])
                 self.reset()
-
 
 if __name__ == "__main__":
     unittest.main()
