@@ -221,7 +221,7 @@ flowchart TD
 
 A CI mínima da Factory roda em PRs destinadas à `main`. `PR size` confere o diff da PR com o verificador e os atributos Git do commit base. `Python tests` roda a suíte versionada no merge de teste preparado pelo GitHub e registra os SHAs da base, do head e do merge. Os checks locais da demonstração com Chrome ficam fora desse workflow.
 
-Os jobs rodam em executores separados com acesso de leitura. A configuração do workflow ainda vem da PR. Para tornar os checks obrigatórios, proteja essa configuração contra mudanças do Builder e exija os checks no GitHub.
+Os jobs rodam em executores separados com acesso de leitura. A configuração do workflow vem da PR. `.github/CODEOWNERS` atribui a Luis a revisão dos workflows, do gate de tamanho, dos testes da Factory e do próprio arquivo de propriedade. A exigência dessa revisão depende da regra de proteção da `main`.
 
 | Risco da mudança | Exemplos | Aprovações formais |
 | --- | --- | --- |
@@ -230,6 +230,14 @@ Os jobs rodam em executores separados com acesso de leitura. A configuração do
 | Alto (`high`) | Caminhos importantes do sistema | 2 pessoas diferentes |
 
 O risco depende da mudança, não de quem escreveu o código. Aprovar a PR e permitir que ela seja juntada ao produto são decisões diferentes. Um commit novo pede novamente o CI e os controles que esse commit afetou.
+
+### Proteção da `main`
+
+Para ativar a proteção, integre primeiro o `CODEOWNERS` e separe a identidade que publica a PR da identidade humana que revisa e faz o squash. A aprovação deve vir de uma pessoa diferente do autor e de quem fez o último push. A credencial de publicação fica sem acesso administrativo ou bypass.
+
+A regra de CI deve exigir PR, os checks `PR size` e `Python tests` do aplicativo GitHub Actions e a base atualizada. Deve invalidar aprovações anteriores quando há mudanças que precisam de nova revisão e exigir aprovação do dono nos caminhos protegidos. As aprovações da tabela de risco são adicionais à aprovação mínima da regra. Antes de integrar, confira a conclusão `success` dos dois jobs, pois o GitHub também pode aceitar `neutral` ou `skipped` como status obrigatório.
+
+Uma regra separada deve restringir as atualizações da `main` à identidade humana via PR. O bypass fica limitado à regra de atualização. Com a base alterada, atualize a PR pela identidade de publicação e confirme a nova execução sobre os SHAs vigentes.
 
 ### 10 · Navegador
 
