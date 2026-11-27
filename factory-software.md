@@ -219,6 +219,10 @@ flowchart TD
 3. **Segurança:** um revisor independente procura exposição de dados, permissões erradas, segredos e configurações perigosas. Um risco crítico com evidência bloqueia a fila mesmo que os outros revisores discordem. Depois da correção, a mudança volta ao builder e passa por uma nova revisão de segurança.
 4. **Aprovação por risco:** um agente dá à mudança uma nota de risco baixa, média ou alta. Outro agente confere essa nota. Se discordarem, vale o nível mais alto até Luis decidir.
 
+A CI mínima da Factory roda em PRs destinadas à `main`. `PR size` confere o diff da PR com o verificador e os atributos Git do commit base. `Python tests` roda a suíte versionada no merge de teste preparado pelo GitHub e registra os SHAs da base, do head e do merge. Os checks locais da demonstração com Chrome ficam fora desse workflow.
+
+Os jobs rodam em executores separados com acesso de leitura. A configuração do workflow ainda vem da PR. Para tornar os checks obrigatórios, proteja essa configuração contra mudanças do Builder e exija os checks no GitHub.
+
 | Risco da mudança | Exemplos | Aprovações formais |
 | --- | --- | --- |
 | Baixo (`low`) | Documentação, textos ou mudança interna atrás de uma flag | 0 |
