@@ -22,4 +22,4 @@
 
 <!-- Registre decisões tomadas sem o responsável, suposições e o que ficou sem validação. -->
 
-- [ ] A PR altera no máximo 300 linhas de código, incluindo produção e testes. Documentação, comentários e linhas em branco ficam fora da contagem. Se exceder o limite, divida a mudança em PRs menores.
+- [ ] A PR soma no máximo 300 adições e exclusões no diff completo. Conte todos os arquivos e linhas, inclusive documentação, comentários e linhas em branco. Se a contagem for inconclusiva ou houver binário, encaminhe para avaliação humana. Se exceder o limite, interrompa a publicação e proponha uma divisão para aprovação.
