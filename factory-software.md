@@ -80,9 +80,9 @@ Se um pedido estiver confuso, se um teste não puder ser repetido ou se houver u
 
 Use a label `factory` para mandar um pedido à triagem. Use `ready-for-agent` quando a especificação e os tickets já estiverem preparados. Nesse caso, o spec writer não precisa prepará-los de novo.
 
-O intake escolhe o menor resultado que já pode ser testado. Um pedido grande vira vários tickets pequenos dentro de um milestone, para acompanhar o progresso.
+O intake escolhe o menor resultado que já pode ser testado. Para um pedido grande, propõe tickets menores dentro de um milestone e aguarda aprovação antes de criá-los.
 
-Cada PR pode ter no máximo 300 linhas de código, contando produção e testes. Documentação, comentários e linhas em branco não entram na contagem. Se uma mudança passar do limite, a fábrica divide o trabalho em fatias menores, cria um ticket e uma PR para cada fatia e as agrupa no milestone. Essa divisão não espera uma decisão do Luis.
+Cada PR pode somar até 300 linhas adicionadas e removidas no diff completo. A contagem inclui produção, testes, documentação, comentários, linhas em branco, configurações, migrations, arquivos gerados e lockfiles. Renomes contam como remoção e adição. Arquivos binários ou contagem inconclusiva exigem avaliação humana. Se uma mudança exceder o limite, interrompa a publicação e proponha a decomposição para aprovação de Luis.
 
 ```mermaid
 flowchart TD
@@ -129,9 +129,9 @@ flowchart LR
     outro -->|Não| checks["05 · Rodar checks locais"]
     checks --> resultado{"Todos os checks passaram?"}
     resultado -->|Não| builder
-    resultado -->|Sim| limite{"A PR passa de 300 linhas?"}
-    limite -->|Sim| dividir["Dividir em PRs menores<br/>sem esperar decisão humana"]
-    limite -->|Não| revisao["06 · Revisão local"]
+    resultado -->|Sim| limite{"Contagem conclusiva e até 300 linhas?"}
+    limite -->|Não| escalar["Encaminhar a Luis<br/>propor divisão se exceder 300"]
+    limite -->|Sim| revisao["06 · Revisão local"]
 ```
 
 ### 03 · Tester
@@ -146,7 +146,7 @@ O builder muda só o necessário e mantém o teste de aceite do tester. Quando o
 
 O autor roda testes, lint, checagem de tipos e build. Os testes tentam usar o programa. O lint procura deslizes no código, a checagem de tipos verifica se os dados combinam e o build confere se as partes formam um programa. Também procura coisas que pararam de funcionar e código repetido. O resultado fica em `checks.md`, com o SHA, os comandos e seus resultados. Se o projeto não tiver detector de duplicação, isso fica escrito no relatório.
 
-Cada prova vale para uma versão exata. Um novo commit muda o SHA, então as provas ligadas à versão anterior precisam ser conferidas novamente. Os checks também verificam o tamanho da PR. Se ela passar do limite descrito acima, a fábrica divide o trabalho em mais fatias e PRs, sem pedir que Luis decida como dividir.
+Cada prova vale para uma versão exata. Um novo commit muda o SHA, então as provas ligadas à versão anterior precisam ser conferidas novamente. O gate de tamanho bloqueia a publicação se o total exceder o limite, se houver arquivo binário ou se a contagem for inconclusiva.
 
 ## 06 a 08 · Revisar e decidir se a PR pode ser aberta
 
