@@ -12,6 +12,8 @@ O `/factory run` também conduz as issues prontas com teste cadastrado. O Claude
 
 O `/factory build <n>` reutiliza uma PR aberta da issue ou abre uma em rascunho quando a implementação nova recebe parecer `PRONTO` e uma aprovação independente, com sessão própria distinta do Builder e do revisor. Antes do commit e do push, `factory/build_approval.py` confere o registro, a base remota atual e o SHA-256 do diff; sem essa conferência, a PR não é aberta. A descrição usa o template do repositório e inclui o critério de aceite, os testes e as lacunas. Os pareceres `VOLTAR` e `ESCALAR` registram o motivo e encerram a execução antes de abrir uma PR. O merge depende da autorização de Luis.
 
+`/factory prepare <n>` prepara a worktree da issue em `<nome-do-checkout>.factory-worktrees/issue-<n>`, ao lado do checkout principal. Reexecuções reutilizam o mesmo diretório se o HEAD estiver destacado no SHA da base e o Git não detectar alterações pendentes. Para retomar a Fase 0, execute `python3 factory/intake.py` dentro dessa worktree, onde ficam os registros ignorados de `factory/jobs/`. Se o caminho estiver ocupado por outro diretório, houver mudanças pendentes ou a base avançar, a preparação para e preserva o trabalho. O lock compartilhado serializa a preparação da worktree.
+
 ## A ideia em poucas palavras
 
 Alguém faz um pedido. A fábrica escolhe uma parte pequena, prepara essa parte, testa o trabalho e pede que outras pessoas confiram. Só depois a mudança entra no produto. Se surgir uma decisão que só uma pessoa pode tomar, a fábrica para e pede ajuda.
