@@ -233,6 +233,8 @@ O risco depende da mudança, não de quem escreveu o código. Aprovar a PR e per
 
 ### Proteção da `main`
 
+A prova do bloqueio de integração usa uma branch descartável com a mesma regra de atualização da `main`.
+
 Para ativar a proteção, integre primeiro o `CODEOWNERS` e separe a identidade que publica a PR da identidade humana que revisa e faz o squash. A aprovação deve vir de uma pessoa diferente do autor e de quem fez o último push. A credencial de publicação fica sem acesso administrativo ou bypass.
 
 O Factory Publisher publica com um token de instalação temporário limitado a este repositório. A chave privada fica no ambiente que emite o token, fora do Builder. A prova de publicação registra o autor `factory-publisher[bot]`, o SHA enviado e as conclusões de `PR size` e `Python tests`.
