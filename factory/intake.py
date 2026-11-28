@@ -11,6 +11,11 @@ from tempfile import NamedTemporaryFile
 REPO = "LuisCarlos-SE/factory-software"
 JOBS = Path(__file__).resolve().parent / "jobs"
 STATUSES = {"ready": "Pronto para planejar", "needs-human": "Precisa de você"}
+TRANSITIONS = {
+    None: {"intake"},
+    "intake": {"planning", "blocked"},
+    "planning": {"planned"},
+}
 SCHEMA = {
     "type": "object",
     "properties": {
@@ -44,10 +49,15 @@ def ask_model(payload, prompt, schema):
     return result
 
 
+def validate_classification(result):
+    if (not isinstance(result, dict) or result.get("status") not in tuple(STATUSES)
+            or not isinstance(result.get("detail"), str) or not result["detail"].strip()):
+        raise ValueError("A triagem precisa ter um status válido e um detalhe em texto.")
+
+
 def classify(ticket):
     result = ask_model(ticket, PROMPT, SCHEMA)
-    if result.get("status") not in STATUSES or not str(result.get("detail") or "").strip():
-        raise ValueError("Claude não devolveu uma triagem válida.")
+    validate_classification(result)
     return result
 
 
@@ -70,6 +80,57 @@ def save(path, content):
     os.replace(out.name, path)
 
 
+def state_from_evidence(job):
+    if "result" not in job and "plan" not in job:
+        return "intake"
+    result = job.get("result")
+    validate_classification(result)
+    if result["status"] == "needs-human" and "plan" not in job:
+        return "blocked"
+    if result["status"] == "ready":
+        if "plan" not in job:
+            return "planning"
+        if isinstance(job["plan"], str) and job["plan"].strip():
+            return "planned"
+    raise ValueError("O plano salvo é incompatível com a triagem do job.")
+
+
+def save_job(path, job):
+    save(path, json.dumps(job, ensure_ascii=False, indent=2))
+    return job
+
+
+def transition(path, job, state, **evidence):
+    previous = job.get("state")
+    if state not in TRANSITIONS.get(previous, ()):
+        raise ValueError(f"Transição inválida do job: {previous} → {state}.")
+    updated = {**job, **evidence, "state": state}
+    if state_from_evidence(updated) != state:
+        raise ValueError(f"Estado do job #{path.stem} incompatível com a evidência da transição.")
+    return save_job(path, updated)
+
+
+def prepare_job(path, ticket):
+    job = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    if not isinstance(job, dict):
+        raise ValueError(f"Registro do job #{path.stem} precisa ser um objeto JSON.")
+    if job.get("ticket") != ticket:
+        job = transition(path, {"ticket": ticket}, "intake")
+    else:
+        expected = state_from_evidence(job)
+        if "state" not in job:
+            job = save_job(path, {**job, "state": expected})
+        elif job["state"] != expected:
+            raise ValueError(f"Estado do job #{path.stem} incompatível com a evidência salva.")
+
+    if job["state"] == "intake":
+        result = classify(ticket)
+        job = transition(path, job, state_from_evidence({"result": result}), result=result)
+    if job["state"] == "planning":
+        job = transition(path, job, "planned", plan=plan(ticket, job["result"]["detail"]))
+    return job
+
+
 def update():
     pages = run_json(["gh", "api", "--paginate", "--slurp",
                       f"repos/{REPO}/issues?state=open&labels=factory&per_page=100"])
@@ -81,36 +142,31 @@ def update():
                 continue
             number = int(issue["number"])
             ticket = {"title": issue["title"], "body": issue["body"] or ""}
-            path = JOBS / f"{number}.json"
-            cached = json.loads(path.read_text()) if path.exists() else {}
-            if cached.get("ticket") != ticket:
-                result = classify(ticket)
-                cached = {"ticket": ticket, "result": result}
-                save(path, json.dumps(cached, ensure_ascii=False, indent=2))
-            result = cached["result"]
-            state = result["status"]
+            try:
+                job = prepare_job(JOBS / f"{number}.json", ticket)
+            except (OSError, ValueError, subprocess.CalledProcessError) as error:
+                raise ValueError(f"Não foi possível preparar a issue #{number}. {error}") from error
+            result = job["result"]
+            status = result["status"]
             plan_link = ""
             acceptance = ""
             acceptance_message = ""
             evidence = JOBS / f"{number}-aceite.json"
-            if state == "ready" and evidence.is_file():
-                last_check = json.loads(evidence.read_text())
-                if last_check["ticket"] == ticket:
-                    acceptance_message = last_check["message"]
-                    acceptance = f'<p>Último teste de aceite: {escape(acceptance_message)}</p>'
-            if state == "ready":
-                if "plan" not in cached:
-                    cached["plan"] = plan(ticket, result["detail"])
-                    save(path, json.dumps(cached, ensure_ascii=False, indent=2))
+            if job["state"] == "planned":
+                if evidence.is_file():
+                    last_check = json.loads(evidence.read_text())
+                    if last_check["ticket"] == ticket:
+                        acceptance_message = last_check["message"]
+                        acceptance = f'<p>Último teste de aceite: {escape(acceptance_message)}</p>'
                 filename = f"{number}-fase0.md"
-                save(JOBS / filename, f"# Issue {number} · Fase 0\n\n{result['detail']}\n\n{cached['plan']}\n")
+                save(JOBS / filename, f"# Issue {number} · Fase 0\n\n{result['detail']}\n\n{job['plan']}\n")
                 plan_link = f'<p><a href="{filename}">Abrir plano da Fase 0</a></p>'
             rows.append(f'<article><a href="https://github.com/{REPO}/issues/{number}">'
                         f'#{number} · {escape(ticket["title"])}</a>'
-                        f'<p class="{state}">{STATUSES[state]}</p>'
+                        f'<p class="{status}">{STATUSES[status]}</p>'
                         f'<p>{escape(result["detail"])}</p>{plan_link}{acceptance}</article>')
-            track_jobs.append({"id": number, "title": ticket["title"], "status": state,
-                               "detail": result["detail"], "plan": cached.get("plan", ""),
+            track_jobs.append({"id": number, "title": ticket["title"], "status": status,
+                               "detail": result["detail"], "plan": job.get("plan", ""),
                                "acceptance": acceptance_message})
     content = "\n".join(rows) or "<p>Nenhuma issue aberta com a etiqueta factory.</p>"
     template = (Path(__file__).parent / "painel.html").read_text()

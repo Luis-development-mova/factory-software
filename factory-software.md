@@ -110,6 +110,8 @@ flowchart TD
 
 O intake lê o pedido e o contexto disponível. Ele não executa comandos no computador. Se o pedido for simples e fácil de desfazer, o próprio texto da issue pode servir de contrato. Se faltar um detalhe técnico, o spec writer registra a suposição. Sem um resultado que possa ser testado, a issue espera a ajuda de Luis.
 
+O intake grava o estado em `factory/jobs/<n>.json`. O job passa de `intake` a `planning` e `planned`, ou de `intake` a `blocked` quando precisa de decisão humana. Cada transição grava o estado junto com a evidência disponível. Ao repetir o intake no mesmo checkout, um job em `planning` reaproveita a triagem salva. O Markdown da Fase 0 é regenerado do JSON em `planned`, que deixa a issue elegível para o teste de aceite. Alterações no título ou no corpo iniciam nova triagem.
+
 Na Fase 0, uma ferramenta procura no código exemplos parecidos e os testes que já existem. O builder anota o que pode reaproveitar, quais arquivos serão afetados, como testar e como desfazer a mudança. Um script escolhe os revisores e os modelos de cada tarefa. O resultado fica em `fase0.md`.
 
 ## 03 a 05 · Escrever o teste, fazer a mudança e conferir
