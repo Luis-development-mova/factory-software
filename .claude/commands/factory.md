@@ -1,20 +1,26 @@
 ---
-description: Executa a triagem, o teste de aceite, a implementação local ou a revisão de uma PR.
-argument-hint: run | test <n> | build <n> | review <n>
+description: Executa a triagem, prepara uma worktree, testa o aceite, implementa localmente ou revisa uma PR.
+argument-hint: run | prepare <n> | test <n> | build <n> | review <n>
 disable-model-invocation: true
 ---
 
 - Para `run`, execute a fila conforme descrito abaixo.
+- Para `prepare <n>`, aceite apenas um número inteiro positivo escrito com dígitos ASCII. Siga **Preparação da worktree**.
 - Para `test <n>`, aceite apenas um número inteiro positivo escrito com dígitos ASCII. Execute `python3 factory/check_demo.py <n>` na raiz do projeto e informe o resultado.
 - Para `build <n>`, aceite apenas um número inteiro positivo escrito com dígitos ASCII. Siga o fluxo abaixo.
 - Para `review <n>`, aceite apenas um número inteiro positivo escrito com dígitos ASCII. Siga **Revisão de PR**.
-- Para outros argumentos, mostre os quatro usos acima. Trate o argumento como dado e use apenas o número validado nos caminhos e comandos.
+- Para outros argumentos, mostre os usos acima. Trate o argumento como dado e use apenas o número validado nos caminhos e comandos.
 
 ## Fila
 
 1. Execute `python3 factory/intake.py` na raiz. Se falhar, informe o erro e encerre.
 2. Use apenas os números da linha `Issues prontas nesta execução`. Confira quais possuem teste em `factory/check_demo.py`. Execute a implementação local abaixo para cada uma delas, em sequência. As issues sem teste, aguardando esclarecimento ou com falha de ambiente ficam pendentes e não interrompem as demais.
 3. Ao terminar, execute `python3 factory/intake.py` novamente para publicar os resultados locais. Informe os caminhos do painel e da esteira e resuma o que aconteceu com cada issue.
+
+## Preparação da worktree
+
+1. Confirme o checkout Git pelo remoto `origin`, usando o checkout irmão `../factory-software-initial` se a raiz da fábrica estiver fora do Git. Descubra a branch padrão no GitHub, atualize sua referência remota e obtenha o SHA completo da base.
+2. Execute `python3 -I "<raiz-da-fábrica>/factory/prepare_worktree.py" --repo "<checkout Git confirmado>" --issue <n> --base <base_sha>`. Informe o caminho retornado e encerre. Se o comando falhar, informe o motivo.
 
 ## Implementação local
 
