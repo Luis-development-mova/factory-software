@@ -1,0 +1,51 @@
+name: Factory CI
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  pr-size:
+    name: PR size
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Count the PR diff with the base policy
+        run: |
+          git switch --detach "$PR_BASE_SHA"
+          python3.12 -IB factory/pr_size.py --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA"
+
+  python-tests:
+    name: Python tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Verify the test merge and run the Python suite
+        run: |
+          merge_parents=$(git show -s --format=%P HEAD)
+          if [[ "$merge_parents" != "$PR_BASE_SHA $PR_HEAD_SHA" ]]; then
+            printf 'Checkout parents do not match the PR base and head.\n' >&2
+            exit 1
+          fi
+          printf 'Base %s | head %s | merge %s\n' "$PR_BASE_SHA" "$PR_HEAD_SHA" "$(git rev-parse HEAD)"
+          python3.12 -IB -m unittest discover -s factory -p 'test_*.py'

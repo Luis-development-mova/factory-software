@@ -1,0 +1,55 @@
+<!doctype html>
+<!-- Modelo de factory/intake.py. A triagem troca o marcador FACTORY_DATA pela lista de issues
+     e grava factory/jobs/esteira.html. Sem essa troca, a página só mostra uma mensagem. -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Esteira · Fábrica</title>
+<style>
+  body { margin: 2rem; font: 15px/1.5 system-ui, sans-serif; background: #0d0e10; color: #e6e7e9; }
+  article { border: 1px solid #32353c; border-radius: 6px; padding: .75rem 1rem; margin-bottom: .75rem; }
+  .ready { color: #3fb950; }
+  .needs-human { color: #d29922; }
+  pre { white-space: pre-wrap; color: #a3a6ad; }
+</style>
+</head>
+<body>
+<h1>Esteira</h1>
+<main id="lista"></main>
+<script>
+const realJobs = /* FACTORY_DATA */ null;
+const STATUS = { ready: 'Pronto para planejar', 'needs-human': 'Precisa de você' };
+const lista = document.getElementById('lista');
+if (realJobs === null) {
+  lista.textContent = 'Sem dados. Rode /factory run para gerar esta página.';
+} else if (realJobs.length === 0) {
+  lista.textContent = 'Nenhuma issue aberta com a etiqueta factory.';
+} else {
+  for (const job of realJobs) {
+    const card = document.createElement('article');
+    const link = document.createElement('a');
+    link.href = job.issueUrl;
+    link.textContent = `#${job.id} · ${job.title}`;
+    const status = document.createElement('p');
+    status.className = job.status;
+    status.textContent = STATUS[job.status] ?? job.status;
+    const detail = document.createElement('p');
+    detail.textContent = job.detail;
+    card.append(link, status, detail);
+    if (job.acceptance) {
+      const acceptance = document.createElement('p');
+      acceptance.textContent = job.acceptance;
+      card.append(acceptance);
+    }
+    if (job.plan) {
+      const plan = document.createElement('pre');
+      plan.textContent = job.plan;
+      card.append(plan);
+    }
+    lista.append(card);
+  }
+}
+</script>
+</body>
+</html>

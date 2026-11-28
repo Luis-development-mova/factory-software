@@ -1,0 +1,5 @@
+# CI configuration, size policy, and tests run by CI.
+/.github/CODEOWNERS @LuisCarlos-SE
+/.github/workflows/ @LuisCarlos-SE
+/factory/pr_size.py @LuisCarlos-SE
+/factory/test_*.py @LuisCarlos-SE
